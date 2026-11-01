@@ -43,5 +43,5 @@ export default function QuanLyKhachHang() {
         </div>
       )}
     </div>
-  );
+  )
 }
