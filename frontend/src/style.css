@@ -1,30 +1,62 @@
 
 @import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap");
 
+/* ================= 1. BIẾN MÀU CHỦ ĐẠO ================= */
+
 :root {
   font-family: "Be Vietnam Pro", Arial, sans-serif;
-  color: #2b2325;
-  background: #fcf4f6;
+  color: #382b30;
+  background: #fff8fa;
   font-synthesis: none;
   font-size: 14px;
   line-height: 1.6;
-  
-  /* Bảng màu nhận diện PinkBook */
-  --green: #d81b60;          /* Tông hồng đậm chủ đạo cho nút & tiêu đề */
-  --primary: #ff5e83;        /* Hồng tươi pastel */
-  --primary-hover: #e04368;  /* Hồng đậm khi hover */
-  --lime: #fff0f3;           /* Hồng phấn rất nhạt làm nền thẻ / badge */
-  --border: #f7d6de;         /* Viền hồng nhạt */
+
+  --green: #c2185b;
+  --primary: #ec6090;
+  --primary-hover: #d94378;
+  --primary-light: #fff0f5;
+  --primary-soft: #ffe2eb;
+
+  --lime: #fff8fa;
+  --border: #f4d6e0;
+  --text: #382b30;
+  --text-light: #88747d;
+
+  --success: #2e9d70;
+  --warning: #e99a36;
+  --danger: #dc5262;
+  --info: #668bd7;
+
+  --shadow-sm: 0 3px 12px rgba(190, 75, 115, 0.06);
+  --shadow-md: 0 8px 25px rgba(190, 75, 115, 0.10);
+  --shadow-lg: 0 15px 40px rgba(190, 75, 115, 0.14);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
 }
+
+/* ================= 2. RESET & CƠ BẢN ================= */
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  background-color: var(--lime);
-  color: #2b2325;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--lime);
+  color: var(--text);
+  font-family: "Be Vietnam Pro", Arial, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 button,
@@ -43,99 +75,87 @@ textarea {
 }
 
 button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--green);
-  border-radius: 8px;
-  padding: 9px 15px;
   cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-button:hover {
-  background: #fff0f3;
-  border-color: #ff85a2;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  transform: none;
 }
 
 a {
   color: var(--green);
   text-decoration: none;
+  transition: color 0.2s ease;
 }
 
-input,
-select,
-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  color: #2b2325;
-  min-width: 0;
-  transition: border-color 0.2s;
+a:hover {
+  color: var(--primary-hover);
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-  border-color: var(--primary);
-  outline: none;
+::selection {
+  background: #ffd5e3;
+  color: #9e174d;
 }
 
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--green);
+/* ================= 3. THANH CUỘN ================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-textarea {
-  resize: vertical;
+::-webkit-scrollbar-track {
+  background: #fff0f5;
+  border-radius: 10px;
 }
 
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #4a3e3d;
+::-webkit-scrollbar-thumb {
+  background: #efb4c8;
+  border-radius: 10px;
 }
 
-label input,
-label select,
-label textarea {
-  margin-top: 6px;
+::-webkit-scrollbar-thumb:hover {
+  background: #e58aa9;
 }
 
-h1, h2, h3, p {
+/* ================= 4. TIÊU ĐỀ ================= */
+
+h1,
+h2,
+h3,
+h4,
+p {
   margin-top: 0;
 }
 
 h1 {
   font-size: 28px;
-  letter-spacing: -0.5px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
   line-height: 1.3;
   color: var(--green);
 }
 
 h2 {
   font-size: 22px;
-  letter-spacing: -0.5px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
   line-height: 1.4;
   color: var(--green);
 }
 
 h3 {
   font-size: 16px;
-  color: #2b2325;
+  font-weight: 700;
+  color: var(--text);
 }
 
 p {
@@ -144,42 +164,183 @@ p {
 
 small {
   display: block;
-  color: #806e72;
+  color: var(--text-light);
   font-size: 11px;
 }
 
-/* ================= BẢNG & DỮ LIỆU (TABLES) ================= */
+/* ================= 5. INPUT & FORM ================= */
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #b7a5ac;
+  font-size: 12px;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #eeb1c5;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(236, 96, 144, 0.12);
+  outline: none;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: #59464e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+label input,
+label select,
+label textarea {
+  margin-top: 6px;
+}
+
+/* ================= 6. NÚT BẤM ================= */
+
+button {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--green);
+  border-radius: 10px;
+  padding: 9px 15px;
+  font-weight: 600;
+}
+
+button:hover {
+  background: var(--primary-light);
+  border-color: #ee9db8;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.button-primary,
+.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 4px 10px rgba(236, 96, 144, 0.18);
+}
+
+.button-primary:hover,
+.primary:hover {
+  background: var(--primary-hover);
+  color: #fff;
+  border-color: var(--primary-hover);
+  box-shadow: 0 5px 14px rgba(236, 96, 144, 0.25);
+}
+
+.danger {
+  color: #c62828;
+  background: #fff0f0;
+  border-color: #ffd0d0;
+}
+
+.danger:hover {
+  background: #e65361;
+  color: #fff;
+  border-color: #e65361;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(236, 96, 144, 0.35);
+}
+
+/* ================= 7. BẢNG DỮ LIỆU ================= */
+
 .table-scroll {
   overflow-x: auto;
   width: 100%;
-  margin: 12px 0;
+  margin: 14px 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
 }
 
 table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   text-align: left;
   font-size: 13px;
+  background: #fff;
 }
 
 th {
   color: var(--green);
-  background: #fff0f3;
+  background: #fff0f5;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-th, td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #f7e8ec;
+th,
+td {
+  padding: 14px 13px;
+  border-bottom: 1px solid #f7e8ed;
   vertical-align: middle;
 }
 
-tr:hover {
-  background-color: #fff9fa;
+td {
+  color: #57464d;
+}
+
+tbody tr {
+  transition: background 0.2s ease;
+}
+
+tbody tr:hover {
+  background: #fff8fa;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
 }
 
 td button {
@@ -187,154 +348,239 @@ td button {
   padding: 6px 10px;
 }
 
-/* ================= THẺ BADGES & TRẠNG THÁI ================= */
+/* ================= 8. BADGE & TRẠNG THÁI ================= */
+
 .badge {
-  display: inline-block;
-  background: #ffe0e6;
-  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffe2eb;
+  color: #c2185b;
   border-radius: 20px;
-  padding: 4px 12px;
+  padding: 5px 12px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .badge.purple {
-  background: #f3e5f5;
-  color: #ab47bc;
+  background: #f2e7ff;
+  color: #8951b5;
 }
 
 .badge.coral {
-  background: #ffe0b2;
-  color: #fb8c00;
+  background: #fff0db;
+  color: #d98726;
 }
 
 .badge.completed,
 .badge.in-stock {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: #e5f7ee;
+  color: #25885d;
 }
 
 .badge.pending,
 .badge.low-stock {
-  background: #fff3e0;
-  color: #ef6c00;
+  background: #fff3dc;
+  color: #c98220;
 }
 
 .badge.cancelled,
 .badge.out-stock {
-  background: #ffebee;
-  color: #c62828;
+  background: #ffebed;
+  color: #c53d4e;
 }
 
-/* ================= KHUNG THỐNG KÊ (STATS CARDS) ================= */
+/* ================= 9. THẺ THỐNG KÊ ================= */
+
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
-  margin: 20px 0;
+  margin: 22px 0;
 }
 
 .stats > div {
-  background: white;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
   border: 1px solid var(--border);
-  padding: 20px;
-  border-radius: 14px;
-  box-shadow: 0 4px 15px rgba(255, 94, 131, 0.05);
+  padding: 21px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s ease;
+}
+
+.stats > div:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: #edb2c5;
 }
 
 .stats span {
   font-size: 12px;
-  color: #806e72;
+  color: var(--text-light);
   display: block;
 }
 
 .stats strong {
-  font-size: 24px;
+  font-size: 25px;
+  font-weight: 800;
   display: block;
   margin-top: 8px;
   color: var(--green);
 }
 
-/* ================= PANELS & MODAL ================= */
+/* ================= 10. PANEL & CARD ================= */
+
 .panel {
-  background: white;
+  background: #fff;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   padding: 24px;
   margin: 20px 0;
-  box-shadow: 0 4px 20px rgba(255, 117, 140, 0.08);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease;
 }
+
+.panel:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* ================= 11. MODAL ================= */
 
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(43, 35, 37, 0.5);
+  background: rgba(49, 31, 39, 0.45);
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.2s ease;
 }
 
 .modal {
-  background: white;
+  background: #fff;
   padding: 28px;
   border-radius: 20px;
   width: 540px;
   max-width: 100%;
   max-height: 90vh;
   overflow: auto;
-  box-shadow: 0 20px 60px rgba(216, 27, 96, 0.15);
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border);
+  animation: modalIn 0.25s ease;
 }
 
-/* ================= NÚT BẤM CHÍNH ================= */
-.button-primary,
-.primary {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-}
-
-.button-primary:hover,
-.primary:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-  color: white;
-}
-
-.danger {
-  color: #c62828;
-  background: #ffebee;
-  border-color: #ffcdd2;
-}
-
-.danger:hover {
-  background: #ef5350;
-  color: white;
-}
-
-/* ================= THIẾT BỊ DI ĐỘNG (RESPONSIVE) ================= */
-@media (max-width: 800px) {
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ================= 12. HIỆU ỨNG & TIỆN ÍCH ================= */
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-light);
+  background: #fff;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+}
+
+.section-title {
+  color: var(--green);
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* ================= 13. RESPONSIVE ================= */
+
+@media (max-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .panel {
-    padding: 16px;
+    padding: 18px;
+  }
+}
+
+@media (max-width: 768px) {
+  h1 {
+    font-size: 24px;
+  }
+
+  h2 {
+    font-size: 19px;
+  }
+
+  .panel {
+    padding: 15px;
+    border-radius: 14px;
+  }
+
+  th,
+  td {
+    padding: 11px 10px;
   }
 }
 
 @media (max-width: 480px) {
   .stats {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
-  h1 {
+
+  .stats strong {
     font-size: 22px;
   }
+
+  .panel {
+    padding: 13px;
+    margin: 12px 0;
+  }
+
+  h1 {
+    font-size: 21px;
+  }
+
   h2 {
     font-size: 18px;
   }
-}
 
+  .modal {
+    padding: 18px;
+    border-radius: 15px;
+  }
+}
