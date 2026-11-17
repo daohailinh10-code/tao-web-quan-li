@@ -1,0 +1,23 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Persistent application data and credentials
+data/
+*.sqlite
+*.db
+first-login.txt
+**/first-login.txt
+backups/
+
+# Dependencies and build output
+node_modules/
+**/node_modules/
+frontend/dist/
+dist/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+.DS_Store

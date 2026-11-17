@@ -10,8 +10,8 @@ const release = await acquireDataLock(root);
 const db = await openDb({ dir: resolve(root, "db") });
 await initialize(db, { credentialDir: root });
 const port = Number(process.env.PORT || 3001);
-const server = createApp(db).listen(port, process.env.HOST || "127.0.0.1", () =>
-  console.log(`Backend & production web: http://localhost:${port}`),
+const server = createApp(db).listen(port, process.env.HOST || "0.0.0.0", () =>
+  console.log(`Backend & production web: http://0.0.0.0:${port}`),
 );
 let stopping = false;
 async function stop() {

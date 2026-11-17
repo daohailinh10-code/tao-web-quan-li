@@ -1,38 +1,58 @@
-import { acquireDataLock } from "./lock.js";
-import { mkdir } from "node:fs/promises";
+import { open, readFile, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
-import { openDb } from "./db.js";
-import { initialize } from "./seed.js";
-import { createApp } from "./app.js";
-const root = resolve(process.env.DATA_DIR || "./data");
-await mkdir(root, { recursive: true });
-const release = await acquireDataLock(root);
-const db = await openDb({ dir: resolve(root, "db") });
-await initialize(db, { credentialDir: root });
-const port = Number(process.env.PORT || 3001);
-const server = createApp(db).listen(port, process.env.HOST || "127.0.0.1", () =>
-  console.log(`Backend & production web: http://localhost:${port}`),
-);
-let stopping = false;
-async function stop() {
-  if (stopping) return;
-  stopping = true;
-  server.close(async () => {
-    await db.close();
-    await release();
-    process.exit(0);
-  });
+
+export async function acquireDataLock(directory) {
+  const lockPath = resolve(directory, ".pinkbook.lock");
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open(lockPath, "wx", 0o600);
+      await handle.writeFile(String(process.pid), "utf8");
+      let released = false;
+
+      return async () => {
+        if (released) return;
+        released = true;
+        await handle.close();
+        await unlink(lockPath).catch((error) => {
+          if (error.code !== "ENOENT") throw error;
+        });
+      };
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+
+      let ownerPid;
+      try {
+        ownerPid = Number((await readFile(lockPath, "utf8")).trim());
+      } catch (readError) {
+        if (readError.code === "ENOENT") continue;
+        throw readError;
+      }
+
+      let stale = !Number.isSafeInteger(ownerPid) || ownerPid <= 0;
+      if (!stale) {
+        try {
+          process.kill(ownerPid, 0);
+        } catch (processError) {
+          stale = processError.code === "ESRCH";
+          if (processError.code !== "ESRCH" && processError.code !== "EPERM") {
+            throw processError;
+          }
+        }
+      }
+
+      if (stale) {
+        await unlink(lockPath).catch((unlinkError) => {
+          if (unlinkError.code !== "ENOENT") throw unlinkError;
+        });
+        continue;
+      }
+
+      throw new Error(
+        `Thư mục dữ liệu đang được tiến trình khác sử dụng (PID ${ownerPid}). Chỉ chạy một bản PinkBook trên cùng DATA_DIR.`,
+      );
+    }
+  }
+
+  throw new Error("Không thể tạo khóa dữ liệu PinkBook. Hãy thử khởi động lại.");
 }
-process.on("SIGINT", stop);
-process.on("SIGTERM", stop);
-
-server.on("error", async (e) => {
-  console.error(e.message);
-  await db.close();
-  await release();
-  process.exit(1);
-});
-
-process.on("message", (m) => {
-  if (m === "shutdown") stop();
-});
