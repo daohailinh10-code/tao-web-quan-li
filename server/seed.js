@@ -27,9 +27,6 @@ export async function initialize(
       [ownerPhone, "owner@nhom31.local", "Chủ cửa hàng", await hashPassword(pass)],
     );
     await tx.query(
-      "INSERT INTO settings(id,store_name,phone,address,low_stock) VALUES(1,'PinkBook Store','0901234567','Hà Nội',10)",
-    );
-    await tx.query(
       "INSERT INTO categories(name,attributes) VALUES('Văn học',$1),('Kỹ năng sống',$2),('Khoa học - Công nghệ',$3),('Thiếu nhi',$4)",
       [
         JSON.stringify([{ name: "Tác giả", unit: "" }, { name: "Nhà xuất bản", unit: "" }]),
