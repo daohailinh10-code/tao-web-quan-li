@@ -185,7 +185,7 @@ export function createApp(db) {
           res.setHeader("Cache-Control", "public,max-age=300"),
       }),
     );
-    app.get("*", (req, res) =>
+    app.get("/{*splat}", (req, res) =>
       res.sendFile(resolve(dist, "index.html")),
     );
   }
