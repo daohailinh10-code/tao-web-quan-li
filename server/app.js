@@ -28,18 +28,18 @@ export function createApp(db) {
     });
     if (req.path.startsWith("/api") && !["GET", "HEAD"].includes(req.method)) {
       const origin = req.headers.origin;
-      const forwardedProto = String(req.headers["x-forwarded-proto"] || req.protocol)
-        .split(",")[0]
-        .trim();
-      const requestOrigin = `${forwardedProto}://${req.headers.host}`;
       const trusted = [
-        requestOrigin,
+        `http://${req.headers.host}`,
         process.env.APP_ORIGIN,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
       ].filter(Boolean);
       if (origin && !trusted.includes(origin))
         return res.status(403).json({ error: "Nguồn yêu cầu không được phép." });
+
+      // Kiểm tra mã xác nhận yêu cầu (nếu cần thiết cho bảo mật nhóm)
+      if (req.headers["x-app-request"] !== "nhom31")
+        return res.status(403).json({ error: "Thiếu mã xác nhận yêu cầu." });
     }
     next();
   });
@@ -91,7 +91,7 @@ export function createApp(db) {
     res.cookie("session", t, {
       httpOnly: true,
       sameSite: "strict",
-      secure: process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1",
+      secure: process.env.COOKIE_SECURE === "1",
       maxAge: 7 * 24 * 3600e3,
       path: "/",
     });
@@ -127,12 +127,12 @@ export function createApp(db) {
 
     const result = await db.transaction(async (tx) => {
       const u = await one(tx, "SELECT * FROM users WHERE phone=$1", [phone]);
-      
+
       // Nếu số điện thoại chưa đăng ký
       if (!u) {
         fail("Tài khoản không tồn tại", 401);
       }
-      
+
       // Nếu mật khẩu không đúng hoặc tài khoản bị khóa
       if (!u.active || !(await verifyPassword(p, u.password))) {
         fail("Mật khẩu không đúng", 401);

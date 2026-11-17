@@ -1,19 +1,22 @@
 {
   "name": "pinkbook-manager",
   "version": "1.0.0",
-  "private": true,
+  "description": "Hệ thống Quản lý Cửa hàng Sách - PinkBook Manager (Nhóm 33)",
+  "main": "server/index.js",
   "type": "module",
-  "description": "Hệ thống quản lý cửa hàng sách PinkBook",
-  "engines": { "node": ">=22.12.0" },
   "scripts": {
     "dev": "node scripts/dev.js",
     "start": "node --env-file-if-exists=.env server/index.js",
     "build": "vite build --config frontend/vite.config.js",
-    "backup": "node scripts/backup.js",
-    "restore": "node scripts/restore.js"
+    "backup": "node --env-file-if-exists=.env scripts/backup.js",
+    "restore": "node --env-file-if-exists=.env scripts/restore.js"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.12",
+    "@supabase/supabase-js": "^2.118.0",
     "express": "5.3.0",
     "lucide-react": "^0.468.0",
     "pg": "^8.16.3",
