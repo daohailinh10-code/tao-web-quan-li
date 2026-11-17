@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Hệ thống quản lý cửa hàng sách PinkBook",
-  "engines": { "node": ">=24" },
+  "engines": { "node": ">=22.12.0" },
   "scripts": {
     "dev": "node scripts/dev.js",
     "start": "node --env-file-if-exists=.env server/index.js",
