@@ -46,12 +46,43 @@ if ($copyCode -ge 8) {
 $sourceFiles = @(Get-ChildItem $sourceRoot -Recurse -File -Force -ErrorAction Stop)
 $targetFiles = @(Get-ChildItem $targetRoot -Recurse -File -Force -ErrorAction Stop)
 
-$sourceBytes = [int64](($sourceFiles | Measure-Object -Property Length -Sum).Sum)
-$targetBytes = [int64](($targetFiles | Measure-Object -Property Length -Sum).Sum)
-
-if ($sourceFiles.Count -ne $targetFiles.Count -or $sourceBytes -ne $targetBytes) {
-    throw "Ban sao chua khop: nguon $($sourceFiles.Count) file/$sourceBytes byte; dich $($targetFiles.Count) file/$targetBytes byte. Khong tao .env."
+if ($sourceFiles.Count -ne $targetFiles.Count) {
+    throw "So luong file khong khop: nguon $($sourceFiles.Count), dich $($targetFiles.Count). Khong tao .env."
 }
+
+# Doi chieu tung duong dan, kich thuoc va SHA256; khong chi so sanh tong dung luong.
+$sourceMap = @{}
+foreach ($file in $sourceFiles) {
+    $relative = $file.FullName.Substring($sourceRoot.Length).TrimStart('\')
+    $sourceMap[$relative] = $file
+}
+
+$targetMap = @{}
+foreach ($file in $targetFiles) {
+    $relative = $file.FullName.Substring($targetRoot.Length).TrimStart('\')
+    $targetMap[$relative] = $file
+}
+
+foreach ($relative in $sourceMap.Keys) {
+    if (-not $targetMap.ContainsKey($relative)) {
+        throw "Ban sao thieu file: $relative. Khong tao .env."
+    }
+
+    $sourceFile = $sourceMap[$relative]
+    $targetFile = $targetMap[$relative]
+
+    if ($sourceFile.Length -ne $targetFile.Length) {
+        throw "Kich thuoc file khong khop: $relative. Khong tao .env."
+    }
+
+    $sourceHash = (Get-FileHash -LiteralPath $sourceFile.FullName -Algorithm SHA256).Hash
+    $targetHash = (Get-FileHash -LiteralPath $targetFile.FullName -Algorithm SHA256).Hash
+    if ($sourceHash -ne $targetHash) {
+        throw "Noi dung file khong khop: $relative. Khong tao .env."
+    }
+}
+
+Write-Host "Da doi chieu SHA256 thanh cong cho $($sourceFiles.Count) file." -ForegroundColor Green
 
 $sourceVersion = (Get-Content (Join-Path $sourceDb "PG_VERSION") -Raw).Trim()
 $targetVersion = (Get-Content (Join-Path $targetDb "PG_VERSION") -Raw).Trim()
