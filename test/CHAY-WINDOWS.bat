@@ -3,7 +3,7 @@ chcp 65001 >nul
 cd /d "%~dp0"
 where node >nul 2>&1
 if errorlevel 1 (
-  echo Can cai Node.js 24 truoc khi chay.
+  echo Can cai Node.js 22.12 tro len truoc khi chay.
   pause
   exit /b 1
 )

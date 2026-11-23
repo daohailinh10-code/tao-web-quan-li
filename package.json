@@ -5,7 +5,9 @@
   "main": "server/index.js",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/runtime.test.js && npm run build",
     "dev": "node scripts/dev.js",
+    "stop": "node scripts/stop.js",
     "migrate:data-local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/migrate-data-local.ps1",
     "start": "node --env-file-if-exists=.env server/index.js",
     "build": "vite build --config frontend/vite.config.js",
@@ -13,7 +15,7 @@
     "restore": "node --env-file-if-exists=.env scripts/restore.js"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.12",
@@ -25,7 +27,9 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
     "@vitejs/plugin-react": "^6.0.0",
+    "tailwindcss": "^4.3.5",
     "vite": "8.3.5"
   }
 }

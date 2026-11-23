@@ -1,4 +1,5 @@
 import { rows, one } from "./db.js";
+import { randomUUID } from "node:crypto";
 import {
   fail,
   permit,
@@ -168,11 +169,11 @@ export async function state(db, u) {
     );
     return out;
   }
-  const can = (p) => u.role === "owner" || u.permissions.includes(p);
+  const can = (p) => u.role === "owner" || (u.role === "employee" && (["products", "orders", "customers"].includes(p) || u.permissions.includes(p)));
   if (can("orders") || can("shipping"))
     out.orders = await rows(
       db,
-      "SELECT o.*,u.name customer_name FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.id DESC",
+      "SELECT o.*,COALESCE(u.name,'Khách lẻ') customer_name FROM orders o LEFT JOIN users u ON u.id=o.user_id ORDER BY o.id DESC",
     );
   if (can("inventory") || can("receiving") || can("shipping")) {
     out.locations = await rows(db, "SELECT * FROM locations ORDER BY id");
@@ -184,14 +185,162 @@ export async function state(db, u) {
   }
   if (can("suppliers") || can("receiving"))
     out.suppliers = await rows(db, "SELECT * FROM suppliers ORDER BY id");
+  if (can("customers"))
+    out.customers = (await rows(db, "SELECT u.*,COALESCE(cp.points,0) points FROM users u LEFT JOIN customer_points cp ON cp.customer_id=u.id WHERE u.role='customer' ORDER BY u.id DESC")).map(safeUser);
+  if (can("orders"))
+    out.pos_customers = await rows(db, "SELECT u.id,u.name,u.phone,COALESCE(cp.points,0) points FROM users u LEFT JOIN customer_points cp ON cp.customer_id=u.id WHERE u.role='customer' AND u.active ORDER BY u.name");
   if (u.role === "owner")
     out.users = (await rows(db, "SELECT * FROM users ORDER BY id")).map(
       safeUser,
     );
+  if (u.role === "owner" || u.role === "employee")
+    out.work_shifts = await rows(db, "SELECT w.*,u.name employee_name FROM work_shifts w JOIN users u ON u.id=w.employee_id WHERE w.work_date >= (CURRENT_DATE - INTERVAL '2 months') AND w.work_date < (CURRENT_DATE + INTERVAL '3 months') AND ($1::int IS NULL OR w.employee_id=$1) ORDER BY w.work_date,w.starts_at", [u.role === "owner" ? null : u.id]);
   return out;
 }
 
+export async function schedule(db, u, month, employeeId) {
+  requireUser(u);
+  if (!['owner', 'employee'].includes(u.role)) fail('Không có quyền xem lịch làm.',403);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month || ''))) fail('Tháng không hợp lệ.');
+  const target = u.role === 'owner' ? integer(employeeId,'Nhân viên') : u.id;
+  return rows(db,"SELECT w.*,users.name employee_name FROM work_shifts w JOIN users ON users.id=w.employee_id WHERE w.employee_id=$1 AND w.work_date >= $2::date AND w.work_date < ($2::date + INTERVAL '1 month') ORDER BY w.work_date,w.starts_at",[target,`${month}-01`]);
+}
+
 export async function command(db, u, action, b = {}) {
+  if (action === "shift.assign") {
+    owner(u);
+    const employeeId = integer(b.employee_id, "Nhân viên");
+    const employee = await one(db, "SELECT id FROM users WHERE id=$1 AND role='employee' AND active", [employeeId]);
+    if (!employee) fail("Nhân viên không tồn tại hoặc chưa được duyệt.");
+    const date = String(b.work_date || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date))) fail("Ngày làm không hợp lệ.");
+    const shift = String(b.shift || "");
+    const defaults = { morning: ["08:00", "12:00"], afternoon: ["13:00", "17:00"], full: ["08:00", "17:00"] };
+    if (!defaults[shift]) fail("Ca làm không hợp lệ.");
+    const starts = b.starts_at || defaults[shift][0];
+    const ends = b.ends_at || defaults[shift][1];
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(starts) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(ends) || starts >= ends) fail("Giờ làm không hợp lệ.");
+    const task = "Ca làm việc tại cửa hàng";
+    const row = await one(db, "INSERT INTO work_shifts(employee_id,work_date,shift,starts_at,ends_at,task) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(employee_id,work_date,shift) DO UPDATE SET starts_at=$4,ends_at=$5,task=$6 RETURNING *", [employeeId,date,shift,starts,ends,task]);
+    await audit(db,u,action,`shift:${row.id}`,null,row);
+    return row;
+  }
+  if (action === "shift.remove") {
+    owner(u);
+    const row = await one(db,"SELECT * FROM work_shifts WHERE id=$1",[integer(b.id,"Ca làm")]);
+    if (!row) fail("Không tìm thấy ca làm.",404);
+    if (row.check_in) fail("Ca đã chấm công, không thể xóa.",409);
+    await db.query("DELETE FROM work_shifts WHERE id=$1",[row.id]);
+    await audit(db,u,action,`shift:${row.id}`,row,null);
+    return {message:"Đã xóa ca làm."};
+  }
+  if (action === "shift.clock") {
+    requireUser(u);
+    if (u.role !== "employee") fail("Chỉ nhân viên được tự chấm công.",403);
+    const now = await one(db,"SELECT NOW() current_time, (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date today, (NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')::time local_time");
+    let row;
+    if (b.id) row = await one(db,"SELECT * FROM work_shifts WHERE id=$1 AND employee_id=$2 FOR UPDATE",[integer(b.id,"Ca làm"),u.id]);
+    else {
+      row = await one(db,"SELECT * FROM work_shifts WHERE employee_id=$1 AND work_date=$2 AND check_in IS NOT NULL AND check_out IS NULL ORDER BY starts_at LIMIT 1 FOR UPDATE",[u.id,now.today]);
+      if (!row) row = await one(db,"SELECT * FROM work_shifts WHERE employee_id=$1 AND work_date=$2 AND check_in IS NULL ORDER BY starts_at LIMIT 1 FOR UPDATE",[u.id,now.today]);
+      if (!row) {
+        const finished = await one(db,"SELECT id FROM work_shifts WHERE employee_id=$1 AND work_date=$2 AND check_out IS NOT NULL LIMIT 1",[u.id,now.today]);
+        if (finished) fail("Các ca hôm nay đã chấm giờ ra.",409);
+        row = await one(db,"INSERT INTO work_shifts(employee_id,work_date,shift,starts_at,ends_at,task) VALUES($1,$2,'full','08:00','17:00','Ca tự chấm công') RETURNING *",[u.id,now.today]);
+      }
+    }
+    if (!row) fail("Ca làm không thuộc tài khoản này.",404);
+    if (String(row.work_date).slice(0,10) !== String(now.today).slice(0,10)) fail("Chỉ chấm công trong đúng ngày được phân ca.");
+    if (!row.check_in) {
+      const local = String(now.local_time).slice(0,8);
+      const end = String(row.ends_at).slice(0,8);
+      if (local > "21:00:00") fail("Đã quá giờ chấm công hôm nay.");
+      const midpoint = row.shift === "full" ? "13:00:00" : end;
+      const credit = local >= midpoint ? 0.5 : 1;
+      await db.query("UPDATE work_shifts SET check_in=$1,credit=$2 WHERE id=$3",[now.current_time,credit,row.id]);
+      await audit(db,u,"shift.check_in",`shift:${row.id}`,null,{credit});
+      return {message:`Đã chấm giờ vào. Công tạm tính: ${credit}.`};
+    }
+    if (row.check_out) fail("Ca này đã chấm giờ ra.",409);
+    await db.query("UPDATE work_shifts SET check_out=$1 WHERE id=$2",[now.current_time,row.id]);
+    await audit(db,u,"shift.check_out",`shift:${row.id}`);
+    return {message:"Đã chấm giờ ra."};
+  }
+  if (action === "pos.sale") {
+    permit(u,"orders");
+    if (!Array.isArray(b.lines) || !b.lines.length || b.lines.length > 50) fail("Giỏ hàng trống hoặc quá nhiều sách.");
+    let buyer = null;
+    if (b.buyer_name || b.buyer_phone || b.customer_id) {
+      const buyerName = text(b.buyer_name,"Tên khách tích điểm",100);
+      const buyerPhone = validatePhone(b.buyer_phone);
+      buyer = await one(db,"SELECT id,name,phone,role,active FROM users WHERE phone=$1",[buyerPhone]);
+      if (buyer && (buyer.role !== 'customer' || !buyer.active)) fail("Số điện thoại này không thuộc khách tích điểm đang hoạt động.");
+      if (buyer && buyer.name.trim().toLocaleLowerCase('vi') !== buyerName.toLocaleLowerCase('vi')) fail("Tên không khớp với số điện thoại khách đã đăng ký.");
+      if (!buyer) buyer = await one(db,"INSERT INTO users(name,phone,password,role) VALUES($1,$2,$3,'customer') RETURNING id,name,phone",[buyerName,buyerPhone,await hashPassword(randomUUID())]);
+      if (b.customer_id && Number(b.customer_id) !== buyer.id) fail("Khách tích điểm không khớp.");
+    }
+    const customerId = buyer?.id || null;
+    const lines = [];
+    let total = 0;
+    for (const input of b.lines) {
+      const p = await product(db,input.product_id,true);
+      const quantity = integer(input.quantity,"Số lượng");
+      if (lines.some(line => line.product_id === p.id)) fail("Sách trong giỏ bị trùng.");
+      const balance = await balances(db,p.id);
+      if (balance.actual - balance.reserved < quantity) fail(`${p.name}: không đủ tồn kho.`,409);
+      lines.push({product_id:p.id,sku:p.sku,name:p.name,price:Number(p.price),quantity});
+      total += Number(p.price)*quantity;
+    }
+    const order = await one(db,"INSERT INTO orders(user_id,request_key,request_hash,status,recipient,phone,address,lines,total,paid,completed_at,history) VALUES($1,$2,$3,'completed',$4,$5,'Tại cửa hàng',$6,$7,TRUE,NOW(),'[]') RETURNING id",[customerId,`pos-${Date.now()}-${Math.random()}`,digest(json(lines)),buyer?.name || 'Khách lẻ',buyer?.phone || '',json(lines),total]);
+    for (const line of lines) {
+      let remaining = line.quantity;
+      const positions = await rows(db,"SELECT location_id,quantity FROM stock WHERE product_id=$1 AND quantity>0 ORDER BY location_id",[line.product_id]);
+      for (const stock of positions) {
+        const taken = Math.min(remaining,Number(stock.quantity));
+        if (!taken) continue;
+        const result = await one(db,"UPDATE stock SET quantity=quantity-$3 WHERE product_id=$1 AND location_id=$2 RETURNING quantity",[line.product_id,stock.location_id,taken]);
+        await db.query("INSERT INTO movements(product_id,location_id,delta,balance,actor) VALUES($1,$2,$3,$4,$5)",[line.product_id,stock.location_id,-taken,result.quantity,u.id]);
+        remaining -= taken;
+        if (!remaining) break;
+      }
+      if (remaining) fail(`${line.name}: không đủ tồn kho.`,409);
+    }
+    const earned = buyer ? Math.floor(total * 0.05) : 0;
+    if (earned) await db.query("INSERT INTO customer_points(customer_id,points) VALUES($1,$2) ON CONFLICT(customer_id) DO UPDATE SET points=customer_points.points+$2",[buyer.id,earned]);
+    await audit(db,u,action,`order:${order.id}`,null,{total,customer_id:customerId,earned});
+    return {id:order.id,total,earned,message:"Thanh toán thành công."};
+  }
+  if (action === "stock.receive") {
+    owner(u);
+    const p = await product(db,b.product_id,true);
+    const quantity = integer(b.quantity,"Số lượng nhập");
+    const location = await one(db,"SELECT id FROM locations WHERE active ORDER BY id LIMIT 1");
+    if (!location) fail("Chưa có vị trí kho.");
+    await db.query("INSERT INTO stock(product_id,location_id,quantity) VALUES($1,$2,0) ON CONFLICT DO NOTHING",[p.id,location.id]);
+    const result = await one(db,"UPDATE stock SET quantity=quantity+$3 WHERE product_id=$1 AND location_id=$2 RETURNING quantity",[p.id,location.id,quantity]);
+    await db.query("INSERT INTO movements(product_id,location_id,delta,balance,actor) VALUES($1,$2,$3,$4,$5)",[p.id,location.id,quantity,result.quantity,u.id]);
+    await audit(db,u,action,`product:${p.id}`,null,{quantity,balance:result.quantity});
+    return {message:`Đã nhập ${quantity} cuốn ${p.name}. Tồn kho hiện tại: ${result.quantity}.`};
+  }
+  if (action === "customer.save") {
+    permit(u, "customers");
+    const name = text(b.name, "Họ tên", 100);
+    const phone = validatePhone(b.phone);
+    const email = optionalEmail(b.email) || null;
+    const address = optional(b.address, 500);
+    let result;
+    if (b.id) {
+      const old = await one(db, "SELECT * FROM users WHERE id=$1 AND role='customer'", [integer(b.id, "Khách hàng")]);
+      if (!old) fail("Không tìm thấy khách hàng.", 404);
+      if (Number(b.version) !== old.version) fail("Khách hàng đã được cập nhật. Hãy tải lại.", 409);
+      result = await one(db, "UPDATE users SET name=$1,phone=$2,email=$3,address=$4,version=version+1 WHERE id=$5 RETURNING *", [name, phone, email, address, old.id]);
+      await audit(db, u, action, `user:${result.id}`, safeUser(old), safeUser(result));
+    } else {
+      result = await one(db, "INSERT INTO users(name,phone,email,address,password,role) VALUES($1,$2,$3,$4,$5,'customer') RETURNING *", [name, phone, email, address, await hashPassword(password(b.password))]);
+      await audit(db, u, action, `user:${result.id}`, null, safeUser(result));
+    }
+    return safeUser(result);
+  }
   if (action === "profile") {
     requireUser(u);
     const before = safeUser(u);
@@ -621,7 +770,7 @@ export async function command(db, u, action, b = {}) {
       if (typeof b.active !== "boolean") fail("Trạng thái không hợp lệ.");
       text(b.reason, "Lý do", 500);
       await db.query(
-        "UPDATE users SET active=$1,version=version+1 WHERE id=$2",
+        "UPDATE users SET active=$1,permissions=CASE WHEN $1=TRUE AND role='employee' AND permissions='[]'::jsonb THEN '[\"products\",\"orders\",\"customers\"]'::jsonb ELSE permissions END,version=version+1 WHERE id=$2",
         [b.active, target.id],
       );
       if (!b.active)

@@ -158,3 +158,24 @@ CREATE INDEX IF NOT EXISTS order_status_idx ON orders(status);
 CREATE INDEX IF NOT EXISTS movement_time_idx ON movements(created_at);
 CREATE INDEX IF NOT EXISTS product_category_idx ON products(category_id);
 CREATE INDEX IF NOT EXISTS user_phone_idx ON users(phone);
+
+-- Lịch phân công và chấm công của từng nhân viên.
+CREATE TABLE IF NOT EXISTS work_shifts (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    work_date DATE NOT NULL,
+    shift TEXT NOT NULL CHECK (shift IN ('morning','afternoon','full')),
+    starts_at TIME NOT NULL,
+    ends_at TIME NOT NULL,
+    task TEXT NOT NULL DEFAULT '',
+    check_in TIMESTAMPTZ,
+    check_out TIMESTAMPTZ,
+    credit NUMERIC(3,1) NOT NULL DEFAULT 0,
+    UNIQUE(employee_id, work_date, shift)
+);
+CREATE INDEX IF NOT EXISTS work_shifts_employee_date ON work_shifts(employee_id, work_date);
+
+CREATE TABLE IF NOT EXISTS customer_points (
+    customer_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0)
+);

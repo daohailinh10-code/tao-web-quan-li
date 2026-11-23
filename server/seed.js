@@ -1,5 +1,4 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { randomBytes } from "node:crypto";
 import { one } from "./db.js";
 import { hashPassword } from "./security.js";
 
@@ -12,16 +11,43 @@ export async function initialize(
     await readFile(new URL("./schema.sql", import.meta.url), "utf8"),
   );
 
-  // Nếu đã có user trong hệ thống thì bỏ qua bước khởi tạo
-  if (await one(db, "SELECT id FROM users LIMIT 1")) return;
-
-  const pass =
-    password ||
-    process.env.OWNER_PASSWORD ||
-    randomBytes(15).toString("base64url");
-
   // Mặc định tài khoản chủ cửa hàng dùng số điện thoại chuẩn
   const ownerPhone = "0901234567";
+  const pass = password || process.env.OWNER_PASSWORD || "123456";
+  const writeCredentials = async () => {
+    if (!credentialDir) return;
+    await mkdir(credentialDir, { recursive: true });
+    await writeFile(
+      `${credentialDir}/first-login.txt`,
+      `TAI KHOAN CHU CUA HANG (PINKBOOK MANAGER)\nSo dien thoại: ${ownerPhone}\nMat khau: ${pass}\n\nHãy sử dụng số điện thoại trên để đăng nhập. Đổi mật khẩu trong mục Hồ sơ sau khi đăng nhập.\n`,
+      { mode: 0o600 },
+    );
+  };
+
+  // Đồng bộ mật khẩu quản lý đã yêu cầu với dữ liệu đang có.
+  const existingOwner = await one(db, "SELECT id FROM users WHERE role='owner' LIMIT 1");
+  if (existingOwner) {
+    await db.transaction(async (tx) => {
+      await tx.query("UPDATE users SET password=$1,active=TRUE,version=version+1 WHERE role='owner'", [await hashPassword(pass)]);
+      await tx.query("DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE role='owner')");
+    });
+    await writeCredentials();
+    console.log(`Tài khoản quản lý: ${ownerPhone}`);
+    console.log(`Mật khẩu quản lý: ${pass}`);
+    return pass;
+  }
+
+  // Nếu đã có dữ liệu nhưng thiếu owner thì tạo lại tài khoản quản lý mặc định.
+  if (await one(db, "SELECT id FROM users LIMIT 1")) {
+    await db.query(
+      "INSERT INTO users(phone,email,name,password,role) VALUES($1,$2,$3,$4,'owner')",
+      [ownerPhone, "owner@nhom31.local", "Chủ cửa hàng", await hashPassword(pass)],
+    );
+    await writeCredentials();
+    console.log(`Tài khoản quản lý: ${ownerPhone}`);
+    console.log(`Mật khẩu quản lý: ${pass}`);
+    return pass;
+  }
 
   await db.transaction(async (tx) => {
     // 1. Tạo tài khoản chủ cửa hàng (Owner) với Số điện thoại
@@ -154,18 +180,11 @@ export async function initialize(
     }
   });
 
-  // 8. Lưu thông tin đăng nhập vào file text để tiện theo dõi khi chạy lần đầu
-  if (credentialDir) {
-    await mkdir(credentialDir, { recursive: true });
-    await writeFile(
-      `${credentialDir}/first-login.txt`,
-      `TAI KHOAN CHU CUA HANG (PINKBOOK MANAGER)\nSo dien thoại: ${ownerPhone}\nMat khau: ${pass}\n\nHãy sử dụng số điện thoại trên để đăng nhập. Đổi mật khẩu trong mục Hồ sơ sau khi đăng nhập.\n`,
-      { mode: 0o600 },
-    );
-    console.log(
-      `Đã khởi tạo thành công. Thông tin đăng nhập lưu tại: ${credentialDir}/first-login.txt`,
-    );
-  }
+  // 8. Lưu và in thông tin đăng nhập để dễ sao chép khi chạy lần đầu.
+  await writeCredentials();
+  console.log(`Tài khoản quản lý: ${ownerPhone}`);
+  console.log(`Mật khẩu quản lý: ${pass}`);
+  if (credentialDir) console.log(`Thông tin đăng nhập lưu tại: ${credentialDir}/first-login.txt`);
 
   return pass;
 }
