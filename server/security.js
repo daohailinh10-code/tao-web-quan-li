@@ -36,6 +36,7 @@ export const PERMISSIONS = [
   "receiving",
   "shipping",
   "orders",
+  "customers",
 ];
 
 export function fail(message, status = 400) {
@@ -50,6 +51,7 @@ export function requireUser(u) {
 export function permit(u, p) {
   requireUser(u);
   if (u.role === "owner") return;
+  if (u.role === "employee" && ["products", "orders", "customers"].includes(p)) return;
   if (u.role !== "employee" || !u.permissions.includes(p))
     fail("Bạn không có quyền thực hiện thao tác này.", 403);
 }

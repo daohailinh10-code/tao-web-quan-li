@@ -1,0 +1,32 @@
+[1mdiff --git a/server/index.js b/server/index.js[m
+[1mindex 356512c..778ab06 100644[m
+[1m--- a/server/index.js[m
+[1m+++ b/server/index.js[m
+[36m@@ -1,14 +1,11 @@[m
+[31m-[m
+ import { acquireDataLock } from "./lock.js";[m
+ import { mkdir } from "node:fs/promises";[m
+ import { resolve } from "node:path";[m
+ import { openDb } from "./db.js";[m
+ import { initialize } from "./seed.js";[m
+ import { createApp } from "./app.js";[m
+[31m-[m
+ const root = resolve(process.env.DATA_DIR || "./data");[m
+ const port = Number(process.env.PORT || 3001);[m
+[31m-[m
+ await mkdir(root, { recursive: true });[m
+ [m
+ const release = await acquireDataLock(root);[m
+[36m@@ -62,9 +59,9 @@[m [masync function stop() {[m
+ }[m
+ [m
+ try {[m
+[31m-  db = await openDb({[m
+[31m-    dir: resolve(root, "db"),[m
+[31m-  });[m
+[32m+[m[32m db = await openDb({[m
+[32m+[m[32m  dir: resolve(root, "data", "db"),[m
+[32m+[m[32m});[m
+ [m
+   await initialize(db, {[m
+     credentialDir: root,[m
