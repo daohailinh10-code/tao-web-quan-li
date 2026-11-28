@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
@@ -43,6 +44,7 @@ const getInvoiceTotal = (invoice) =>
 
 const getBookStock = (book) =>
   Number(getValue(book, [
+    'actual',
     'quantity',
     'stock',
     'soLuongTon',
@@ -52,6 +54,7 @@ const getBookStock = (book) =>
 
 const getDate = (object) => {
   const value = getValue(object, [
+    'created_at',
     'createdAt',
     'date',
     'ngayTao',
@@ -142,7 +145,6 @@ export default function ThongKe({
     { id: 'banhang', label: 'Bán hàng', icon: ShoppingCart },
     { id: 'kho', label: 'Kho sách', icon: Package },
     { id: 'khachhang', label: 'Khách hàng', icon: Users },
-    { id: 'nhanvien', label: 'Nhân viên', icon: UserCheck }
   ];
 
   const tabClass = (id) =>

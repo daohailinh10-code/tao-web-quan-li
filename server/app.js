@@ -3,10 +3,12 @@ import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { one } from "./db.js";
-import { command, state, audit } from "./service.js";
+import { command, state, schedule, audit } from "./service.js";
 import {
   text,
   hashPassword,
+  password as validatePassword,
+  phone as validatePhone,
   verifyPassword,
   safeUser,
   digest,
@@ -36,7 +38,7 @@ export function createApp(db) {
       ].filter(Boolean);
       if (origin && !trusted.includes(origin))
         return res.status(403).json({ error: "Nguồn yêu cầu không được phép." });
-      
+
       // Kiểm tra mã xác nhận yêu cầu (nếu cần thiết cho bảo mật nhóm)
       if (req.headers["x-app-request"] !== "nhom31")
         return res.status(403).json({ error: "Thiếu mã xác nhận yêu cầu." });
@@ -98,25 +100,25 @@ export function createApp(db) {
 
   app.get("/api/health", (req, res) => res.json({ ok: true }));
 
-  // Đăng ký tài khoản (Họ tên, Ngày sinh, Số điện thoại, Mật khẩu)
+  // Nhân viên tự đăng ký, chờ chủ cửa hàng duyệt và cấp quyền.
   app.post("/api/register", limit, async (req, res) => {
     const b = req.body;
-    const phone = String(b.phone || "").trim();
+    const phone = validatePhone(b.phone);
     const name = text(b.name, "Họ tên", 100);
-    const dob = b.dob; // Ngày tháng năm sinh
-    const hash = await hashPassword(String(b.password || ""));
+    const hash = await hashPassword(validatePassword(b.password));
 
     await db.transaction(async (tx) => {
       const u = await one(
         tx,
-        "INSERT INTO users(phone,name,dob,password,role) VALUES($1,$2,$3,$4,'customer') RETURNING id",
-        [phone, name, dob, hash],
+        "INSERT INTO users(phone,name,password,role,active) VALUES($1,$2,$3,'employee',FALSE) RETURNING id",
+        [phone, name, hash],
       );
       await audit(tx, { id: u.id }, "register", `user:${u.id}`, null, {
-        role: "customer",
+        role: "employee",
+        active: false,
       });
     });
-    res.json({ message: "Đăng ký thành công. Hãy đăng nhập." });
+    res.json({ message: "Đăng ký thành công. Hãy chờ quản lý duyệt tài khoản." });
   });
 
   // Đăng nhập bằng Số điện thoại và Mật khẩu
@@ -127,16 +129,17 @@ export function createApp(db) {
 
     const result = await db.transaction(async (tx) => {
       const u = await one(tx, "SELECT * FROM users WHERE phone=$1", [phone]);
-      
+
       // Nếu số điện thoại chưa đăng ký
       if (!u) {
         fail("Tài khoản không tồn tại", 401);
       }
-      
+
       // Nếu mật khẩu không đúng hoặc tài khoản bị khóa
-      if (!u.active || !(await verifyPassword(p, u.password))) {
+      if (!(await verifyPassword(p, u.password))) {
         fail("Mật khẩu không đúng", 401);
       }
+      if (!u.active) fail("Tài khoản đang chờ quản lý duyệt hoặc đã bị khóa.", 403);
 
       const t = randomBytes(32).toString("hex");
       await tx.query("DELETE FROM sessions WHERE expires_at<NOW()");
@@ -149,6 +152,15 @@ export function createApp(db) {
 
     cookie(res, result.t);
     res.json({ user: safeUser(result.u) });
+  });
+
+  app.post("/api/demo-login", limit, async (req, res) => {
+    const user = await one(db, "SELECT * FROM users WHERE demo=TRUE AND active LIMIT 1");
+    if (!user) fail("Tài khoản dùng thử chưa sẵn sàng.", 503);
+    const t = randomBytes(32).toString("hex");
+    await db.query("INSERT INTO sessions(token,user_id,expires_at) VALUES($1,$2,NOW()+INTERVAL '1 day')", [digest(t), user.id]);
+    cookie(res, t);
+    res.json({ user: safeUser(user) });
   });
 
   app.post("/api/logout", async (req, res) => {
@@ -165,12 +177,16 @@ export function createApp(db) {
     ),
   );
 
+  app.get("/api/shifts", async (req, res) =>
+    res.json(await db.transaction(async tx => schedule(tx, await current(tx, req), req.query.month, req.query.employee_id))),
+  );
+
   app.post("/api/action/:action", async (req, res) =>
-    res.json(
-      await db.transaction(async (tx) =>
-        command(tx, await current(tx, req), req.params.action, req.body),
-      ),
-    ),
+    res.json(await db.transaction(async (tx) => {
+      const user = await current(tx, req);
+      if (user?.demo) fail("Chế độ dùng thử chỉ xem dữ liệu. Hãy đăng ký tài khoản nhân viên để thao tác.", 403);
+      return command(tx, user, req.params.action, req.body);
+    })),
   );
 
   app.use("/api", (req, res) =>
@@ -185,7 +201,7 @@ export function createApp(db) {
           res.setHeader("Cache-Control", "public,max-age=300"),
       }),
     );
-    app.get("*", (req, res) =>
+    app.get("/{*splat}", (req, res) =>
       res.sendFile(resolve(dist, "index.html")),
     );
   }
