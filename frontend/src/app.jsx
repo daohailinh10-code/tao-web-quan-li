@@ -97,7 +97,6 @@ function Login({ onLogin, initialError }) {
           <button className="login-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý…' : registering ? 'Gửi đăng ký' : 'Đăng nhập'} <ChevronRight size={18} /></button>
           <button className="auth-switch" type="button" onClick={() => { setRegistering(!registering); setError(''); setNotice(''); }}>{registering ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản nhân viên? Đăng ký'}</button>
           {!registering && <button className="demo-login" type="button" disabled={busy} onClick={async () => { setBusy(true); setError(''); try { const data = await request('/api/demo-login', { method: 'POST' }); onLogin(data.user); } catch (cause) { setError(cause.message); } finally { setBusy(false); } }}>Dùng thử giao diện nhân viên</button>}
-          <div className="login-help"><CircleHelp size={16} /> {loginRole === 'owner' && !registering ? <>Tài khoản quản lý: <strong>0901234567</strong>. Dùng mật khẩu bạn đã đặt; mật khẩu khởi tạo chỉ áp dụng khi chưa đổi.</> : 'Tài khoản nhân viên cần được quản lý duyệt trước khi đăng nhập.'}</div>
         </form>
       </div>
     </div>
