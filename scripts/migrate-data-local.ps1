@@ -103,6 +103,9 @@ $envContent = "DATA_DIR=" + $targetForEnv + [Environment]::NewLine
 )
 
 Write-Host ""
+$targetBytes = ($targetFiles | Measure-Object -Property Length -Sum).Sum
+if ($null -eq $targetBytes) { $targetBytes = 0 }
+
 Write-Host "SAO CHEP VA DOI CHIEU THANH CONG." -ForegroundColor Green
 Write-Host "So file: $($targetFiles.Count)"
 Write-Host "Dung luong: $([math]::Round($targetBytes / 1MB, 2)) MB"
